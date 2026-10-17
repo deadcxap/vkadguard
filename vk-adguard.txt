@@ -1,0 +1,28 @@
+[Adblock Plus 2.0]
+! Title: VK — перенос правил расширения 1.8.1 для AdGuard для Windows
+! Version: 1.0.0
+! Last modified: 2026-10-17
+! Description: Локальное скрытие рекламы на vk.ru и vkvideo.ru, включая поддомены.
+!
+! js/content.js:216 — рекламный пункт меню.
+vk.ru,vkvideo.ru###l_invite_menu_promo
+! js/content.js:225 — баннеры VKUI.
+vk.ru,vkvideo.ru##.vkuiBanner__host
+! js/content.js:234 — рекламная игра в правой колонке.
+vk.ru,vkvideo.ru##.apps_feedRightAppsBlock_single_app--promo
+! js/content.js:243 — предложение подписки.
+vk.ru,vkvideo.ru##[data-testid="subscriptionbanner"]
+! js/content.js:251 — следующий пустой разделитель. XPath исключает даже комментарии,
+! как исходная проверка innerHTML === ''; отсутствие style не вызывает ошибку.
+vk.ru,vkvideo.ru#?#[data-testid="subscriptionbanner"] + [style^="--vkit_internal--spacing_gap_size:"]:xpath(self::*[not(node())])
+! js/content.js:259 — полоса «Отправить подарок» в списке диалогов.
+vk.ru,vkvideo.ru##.ConvoList__conversationsBar
+!
+! js/content.js:140,155,171 — посты с текстом «реклама», карточкой магазина
+! или меткой «реклама», собранной из ::before/::after вложенных span.
+! CSS скрывает только article, помеченный следующим JavaScript-правилом.
+vk.ru,vkvideo.ru##article[data-vkar-adguard-ad]
+! Проверки innerText и псевдоэлементов повторяют исходник; отмеченные посты
+! остаются скрытыми, как в расширении, даже после изменения DOM.
+! Нет сетевых запросов, загрузки кода, cookies, хранилища или API расширения.
+vk.ru,vkvideo.ru#%#(() => { if (window.top !== window || location.protocol !== 'https:') return; const marker = 'data-vkar-adguard-ad'; let timer = null; const findArticle = (element) => { const article = element.closest('article'); return article && !article.hasAttribute(marker) ? article : null; }; const readContent = (element, pseudo) => { const content = getComputedStyle(element, pseudo).content; if (!content || content === 'none' || content === 'normal' || content === '""' || content === "''") return ''; return content.replace(/^["']|["']$/g, ''); }; const scan = () => { for (const element of document.querySelectorAll('.vkuiRootComponent__host')) { const article = findArticle(element); if (article && element.innerText.toLowerCase().includes('реклама')) { article.setAttribute(marker, ''); } } for (const element of document.querySelectorAll('[data-testid="secondaryattachment-description"]')) { const article = findArticle(element); if (!article) continue; const text = element.innerText.toLowerCase(); if (text === 'ozon.ru' || text === 'wildberries.ru') article.setAttribute(marker, ''); } for (const label of document.querySelectorAll('span[data-testid="post-header-subtitle"]')) { const article = findArticle(label); if (!article) continue; let text = ''; for (const span of label.querySelectorAll('span')) { text += readContent(span, '::before') + readContent(span, '::after'); } if (text.toLowerCase().trim() === 'реклама') article.setAttribute(marker, ''); } }; const schedule = () => { if (timer !== null) return; timer = setTimeout(() => { timer = null; scan(); }, 100); }; const start = () => { if (!document.documentElement) return; new MutationObserver(schedule).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'data-testid'], }); scan(); window.addEventListener('load', schedule, { once: true }); }; if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', start, { once: true }); } else { start(); } })();
